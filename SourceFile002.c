@@ -33,6 +33,10 @@ void AddDec(Node *n,int d){
 	(*n).nDec++;
 }
 
+void DelDec(Node *n){
+	(*n).nDec = 0;
+}
+
 //end of ADT Node
 
 //ADT Queue
@@ -89,16 +93,19 @@ void Enqueue(Queue *Q,Node n){
 			if (n.nDec != 0){
 				debug = n.nDec;
 				int i;
+				DelDec(&Element(*Q,locate));
 				for(i = 0;i < n.nDec;i++)
 					AddDec(&Element(*Q,locate),n.decision[i]);
 		}
 	}
 }
 
-void Dequeue(Queue *Q,Node *n){
+int Dequeue(Queue *Q,Node *n){
+	int h = Head(*Q);
 	if (Head(*Q) != -1) {
 		SetNode(&*n,Element(*Q,Head(*Q)).level,Element(*Q,Head(*Q)).color);
 		if (Element(*Q,Head(*Q)).nDec != 0){
+			DelDec(&(*n));
 			int i;
 			for(i = 0;i < Element(*Q,Head(*Q)).nDec;i++)
 				AddDec(&*n,Element(*Q,Head(*Q)).decision[i]);
@@ -111,12 +118,15 @@ void Dequeue(Queue *Q,Node *n){
 		Head(*Q) = (Head(*Q) < MAXQUEUE)? Head(*Q) : 0;
 		}
 	}
+	return h;
 }
 
 //end of ADT Queue
 
 #define DEFAULTSPEED 50
 #define FACTOR 0.25
+#define TURNBACK 175
+#define TRIES 3
 #define gyroPort S2
 #define colorPort S3
 
@@ -142,6 +152,7 @@ void steerReverseRightAbit();
 void steerReverseLeftAbit();
 
 void turnNDegree(float n);
+void turnrevNDegree(float n);
 void turnCont(int c);
 void turnRight();
 void turnLeft();
@@ -179,7 +190,16 @@ task main()
 	int FireFound = 0;
 
 	while(!isEmpty(BFS) && !FireFound) {
-		Dequeue(&BFS,&current);
+		int test;
+		test = Dequeue(&BFS,&current);
+		debug = 999;
+		stopMoving()
+		displayTextLine(8,"making decision.%d",test);
+		wait1Msec(100);
+		displayTextLine(8,"making decision..%d",test);
+		wait1Msec(100);
+		displayTextLine(8,"making decision...%d",test);
+		wait1Msec(300);
 		if (current.color == 4)
 			break;
 		else {
@@ -231,7 +251,7 @@ task main()
 //END OF MAIN PROGRAM
 
 void FireDance(){
-
+	displayTextLine(2,"API BERHASIL DIPADAMKAN");
 }
 
 void BFSCoRoutine(int level){
@@ -242,26 +262,33 @@ void BFSCoRoutine(int level){
 			moveForward(0.25);
 			turnRight();
 			debug = 88 + i;
-			ScanColor(colorSensor,&R,&G,&B);
-			color = Color(R,G,B);
+			int f;
+			for(f = 0;f < TRIES;f++){
+				ScanColor(colorSensor,&R,&G,&B);
+				color = Color(R,G,B);
+				turnNDegree(2*f+2);
+				if (color == 0)break;
+			}
 			if (color == 0){
 				Node enter;
 				TraceUntilColor();
 				if ((color == 2) || (color == 4)) {
 					InitNode(&enter,level+1,color);
+					for(f = 0;f < current.nDec;f++)
+						AddDec(&enter,current.decision[f]);
 					AddDec(&enter,i+1);
 					Enqueue(&BFS,enter);
 					if (color == 4) FireDance();
 				}
-				turnNDegree(180);
+				turnNDegree(TURNBACK);
 				TraceUntilColor();
 			} else {
-				turnNDegree(180);
+				turnNDegree(TURNBACK);
 			}
 		} else {
 			turnRight();
 			moveForward(0.25);
-			turnNDegree(180);
+			turnNDegree(TURNBACK);
 			moveForward(0.5);
 		}
 	}
@@ -269,34 +296,36 @@ void BFSCoRoutine(int level){
 
 void Traverse(Node n){
 	int i;
+	stopMoving();
 	for(i = 0;i < n.nDec;i++){
-		debug =  -1 * n.decision[i];
+		debug = 56;
 		switch(n.decision[i]){
-			case 1:turnRight();break;
-			case 2:moveForward(2);break;
-			case 3:turnLeft();break;
+			case 1:turnRight();displayTextLine(7,"right");break;
+			case 2:moveForward(2);displayTextLine(7,"forward");break;
+			case 3:turnLeft();displayTextLine(7,"left");break;
 		}
+		debug = 57;
 		TraceUntilColor();
 	}
 }
 
 void TraverseBack(Node n){
-	turnNDegree(180);
+	turnNDegree(TURNBACK);
 	debug = 42;
 	wait1Msec(100);
 	TraceUntilColor();
 	int i;
 	for(i = n.nDec-1;i == 0;i--){
 		switch(n.decision[i]){
-			case 1:turnLeft();break;
-			case 2:moveForward(2);break;
-			case 3:turnRight();break;
+			case 1:turnLeft();displayTextLine(7,"left");break;
+			case 2:moveForward(2);displayTextLine(7,"forward");break;
+			case 3:turnRight();displayTextLine(7,"right");break;
 		}
 		if (i != 0)
 			TraceUntilColor();
 		else{
 			moveForward(0.25);
-			turnNDegree(180);
+			turnNDegree(TURNBACK);
 			moveForward(0.5);
 		}
 	}
@@ -410,7 +439,17 @@ void turnNDegree(float n){
 	resetGyro(gyroPort);
 	motor[motorC] = 75;
 	motor[motorB] = -75;
-	waitUntil(abs(getGyroDegrees(gyroPort)) > 0.935*n - FACTOR*sqrt(n));
+	waitUntil(abs(getGyroDegrees(gyroPort)) > n - FACTOR*sqrt(n));
+	motor[motorC] = 0;
+	motor[motorB] = 0;
+}
+
+void turnrevNDegree(float n){
+	//assuming n is Positive!
+	resetGyro(gyroPort);
+	motor[motorC] = -75;
+	motor[motorB] = 75;
+	waitUntil(abs(getGyroDegrees(gyroPort)) > n - FACTOR*sqrt(n));
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
