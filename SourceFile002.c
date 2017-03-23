@@ -96,7 +96,7 @@ void moveForwardCont();
 void stopMoving();
 void moveForward(float n);
 
-int BFSRoutine(Queue *Q,int level,Node checking);
+int BFSRoutine(Queue *Q,Node *checking);
 int TraceLineRoutine(int i);
 
 int Color(int R,int G,int B);
@@ -136,14 +136,18 @@ task main()
 	Queue BFS;
 	CreateEmptyQ(&BFS);
 
+	while(1){
+		turnCont(25);
+	}
+
 	sensorReset(colorPort);
 	moveForward(3);
 
 	Node root;
-	SetNode(&root,0,0,0);
+	SetNode(&root,0,0,2);
 
 	Enqueue(&BFS,root);
-	BFSRoutine(&BFS,0,root);
+	BFSRoutine(&BFS,&root);
 
 
 	while(1){
@@ -163,47 +167,41 @@ task main()
 
 //END OF MAIN PROGRAM
 
-int BFSRoutine(Queue *Q,int level,Node checking){
-	do {
-		getColorRGB(colorPort,R,G,B);
-		color = Color(R,G,B);
-		TraceLineRoutine(1);
-		wait1Msec(waitFactor);
-	} while (color == 0);
-	if (color == 2){ //green
-		Node checkQ;
-		Dequeue(&*Q,&checkQ);
-		if ((level == checking.level) && (checking.color == 0)){
-			Node enter;
-			SetNode(&enter,level,1,-1);
-			Enqueue(&*Q,enter);
-			SetNode(&enter,level,2,-1);
-			Enqueue(&*Q,enter);
-			SetNode(&enter,level,3,-1);
-			Enqueue(&*Q,enter);
-			Node checkQ;
-			Dequeue(&*Q,&checkQ);
-			turnRight();
-			BFSRoutine(&*Q,level,checkQ);
-		} else
-		if (level > checking.level) {
-
-		}
-	} else
-	if (color == 1) { //red
-		steerReverseRightAbit();
-		moveForward(-0.5);
+int BFSRoutine(Queue *Q,Node *checking){
+	int level = 0;
+	while(1){
 		do {
-		getColorRGB(colorPort,R,G,B);
-		color = Color(R,G,B);
-		TraceLineRoutine(-1);
-		wait1Msec(waitFactor);
+			getColorRGB(colorPort,R,G,B);
+			color = Color(R,G,B);
+			TraceLineRoutine(1);
+			wait1Msec(waitFactor);
 		} while (color == 0);
-		turnReverseRight();
+
+		//green
+		if (color == 2){
+			if ((*checking).level == level && (*checking).color == 2) {
+				//New Branch Traversing Mode Switch
+					//Enqueue Some
+					Node enter;
+
+					//Try right
+					(*checking).level = 1;
+					(*checking).color = -1;
+					turnRight();
+			} else {
+
+			}
+		} else
+		//red
+		if (color == 1) {
+			turnNDegree(180);
+		}
 	}
+
 	stopMoving();
 	return 1;
 }
+
 
 
 int TraceLineRoutine(int i){
@@ -289,12 +287,11 @@ void moveForward(float n){
 
 
 void turnNDegree(float n){
-	resetGyro(S2);
+	//assuming n is Positive!
+	resetGyro(gyroPort);
 	motor[motorC] = 75;
 	motor[motorB] = -75;
-	if (n > 0)
-		waitUntil(getGyroDegrees(gyroPort) > n - 0.25*sqrt(n));
-	debug = getGyroDegrees(gyroPort);
+	waitUntil(abs(getGyroDegrees(gyroPort)) > n - 0.25*sqrt(n));
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
@@ -305,41 +302,37 @@ void turnCont(int c){
 }
 
 void turnRight(){
-	resetGyro(S2);
+	resetGyro(gyroPort);
 	motor[motorC] = 19;
 	motor[motorB] = 60;
 	waitUntil(getGyroDegrees(gyroPort) > 90 - 0.25*sqrt(90));
-	debug = getGyroDegrees(gyroPort);
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
 
 void turnReverseRight(){
-	resetGyro(S2);
+	resetGyro(gyroPort);
 	motor[motorC] = -19;
 	motor[motorB] = -60;
 	waitUntil(getGyroDegrees(gyroPort) < -90 + 0.25*sqrt(90));
-	debug = getGyroDegrees(gyroPort);
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
 
 void turnLeft(){
-	resetGyro(S2);
+	resetGyro(gyroPort);
 	motor[motorC] = 65;
 	motor[motorB] = 16;
 	waitUntil(getGyroDegrees(gyroPort) < -90 + 0.25*sqrt(90));
-	debug = getGyroDegrees(gyroPort);
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
 
 void turnReverseLeft(){
-	resetGyro(S2);
+	resetGyro(gyroPort);
 	motor[motorC] = -65;
 	motor[motorB] = -16;
 	waitUntil(getGyroDegrees(gyroPort) > 90 - 0.25*sqrt(90));
-	debug = getGyroDegrees(gyroPort);
 	motor[motorC] = 0;
 	motor[motorB] = 0;
 }
